@@ -1,4 +1,4 @@
-rootProject.name = "MyChessappkmp"
+rootProject.name = "chess-app-kmp"
 
 pluginManagement {
     repositories {
