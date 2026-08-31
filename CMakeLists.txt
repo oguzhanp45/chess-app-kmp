@@ -27,5 +27,9 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()
 
+# ctest icin: bridge/tests altindaki capitest add_test ile kaydediliyor.
+#   ctest --test-dir build-desktop -C Release --output-on-failure
+enable_testing()
+
 add_subdirectory(engine engine_build)
 add_subdirectory(bridge bridge_build)

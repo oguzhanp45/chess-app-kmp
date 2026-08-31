@@ -1,0 +1,87 @@
+# ============================================================
+#  chess-app-kmp -- surekli entegrasyon
+# ============================================================
+# Uc is:
+#   capitest  C yuzeyinin gercek testi, uc isletim sisteminde
+#   android   APK derlenip .so'lar iceri giriyor mu (NDK dahil)
+#   ios       iOS hedefleri derlenip baglaniyor mu
+#
+# ios isi Mac'i olmayan gelistirici icin var: depo genel oldugu icin
+# GitHub'in macOS kosucusu ucretsiz. Arayuzu goremeyiz ama iosMain'in
+# bozulmadigini her commit'te ogreniriz.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+
+  capitest:
+    name: capitest (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # -DCHESS_BUILD_TOOLS=OFF zorunlu: engine/ klasoru motor deposunun
+      # yalnizca src/ kismi, tests/ ve uci/ kopyalanmadi.
+      - name: Yapilandir
+        run: cmake -B build-desktop -DCHESS_BUILD_TOOLS=OFF
+
+      - name: Derle
+        run: cmake --build build-desktop --config Release
+
+      - name: Kostur
+        run: ctest --test-dir build-desktop -C Release --output-on-failure
+
+  android:
+    name: Android (APK + NDK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: APK derle
+        run: ./gradlew :androidApp:assembleDebug --stacktrace
+
+      # Derlemenin gecmesi yetmez: .so gercekten paketlendi mi?
+      # Bir seyin derlenip paketlenmedigi durumlar oluyor.
+      - name: .so APK'ya girdi mi
+        run: |
+          APK=androidApp/build/outputs/apk/debug/androidApp-debug.apk
+          unzip -l "$APK" | grep 'lib/arm64-v8a/libchessjni.so'
+          unzip -l "$APK" | grep 'lib/x86_64/libchessjni.so'
+
+  ios:
+    name: iOS (framework baglaniyor mu)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Baglama (link) derlemeyi de kapsar. Iki hedef: gercek cihaz ve
+      # Apple Silicon simulatoru -- wizard ikisini de acti.
+      - name: iOS framework'lerini bagla
+        run: |
+          ./gradlew :shared:linkDebugFrameworkIosArm64 \
+                    :shared:linkDebugFrameworkIosSimulatorArm64 --stacktrace
