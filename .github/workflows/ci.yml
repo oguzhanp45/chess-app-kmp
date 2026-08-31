@@ -55,6 +55,11 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      # Ortak Kotlin testleri: JSON ayristirmasinin C tarafinin urettigi
+      # bicimle uyumlu kaldigini dogrular. Once bunlar kossun, hizli hata verir.
+      - name: Ortak Kotlin testleri
+        run: ./gradlew :shared:testAndroidHostTest --stacktrace
+
       - name: APK derle
         run: ./gradlew :androidApp:assembleDebug --stacktrace
 
