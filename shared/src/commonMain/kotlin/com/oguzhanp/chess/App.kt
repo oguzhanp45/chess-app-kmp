@@ -13,10 +13,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,88 +26,70 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 
-import com.oguzhanp.chess.engine.ChessEngine
-import com.oguzhanp.chess.engine.engineVersion
+import com.oguzhanp.chess.engine.Evaluation
+import com.oguzhanp.chess.engine.GameStatus
+import com.oguzhanp.chess.engine.SearchInfo
+import com.oguzhanp.chess.engine.Side
+import com.oguzhanp.chess.engine.Snapshot
 
 // ============================================================
-//  Faz 1.6b -- kopru dogrulama ekrani
+//  Faz 2.4 -- motor dogrulama ekrani
 // ============================================================
-// Bu ekran GECICIDIR ve tasarim degildir. Tek isi motorun Kotlin'den
-// gercekten surulebildigini gostermek: hamle oyna, geri al, yeni oyun,
-// ve motorun dondurdugu ham durumu gor.
+// Bu ekran GECICIDIR ve tasarim degildir. Tek isi motorun coroutine
+// sarmalayicisinin dogru calistigini gostermek: motor dusunurken arayuz
+// donmuyor mu, canli derinlik akiyor mu, durdurma calisiyor mu.
 //
 // Gercek arayuz Faz 3'te (tahta) ve Faz 5'te (navigasyon) yapilacak;
 // oraya gelmeden once tasarim sorulari sorulacak.
 //
-// Neden ham JSON gosteriyoruz: onu bir Snapshot veri sinifina
-// ayristirmak Faz 2'nin isi. Burada ayristirirsak bir hata cikinca
-// "kopru mu bozuk, ayristirici mi bozuk" diye tahmin yurutmek zorunda
-// kaliriz. Faz 1'in tamami bu tahmini onlemek uzerine kurulu.
-//
-// Yapi: App() durumu tutar, AppContent() yalnizca aldigini cizer.
+// Yapi: App() ViewModel'i baglar, AppContent() yalnizca aldigini cizer.
 
 @Composable
 fun App() {
     MaterialTheme {
-        // Motor ornegi ekran omru boyunca yasar.
-        val engine = remember { ChessEngine() }
+        val viewModel: EngineViewModel = viewModel { EngineViewModel() }
 
-        // C++ tarafindaki nesne kendiliginden yok olmaz; ekran
-        // kaldirilirken close() cagirmazsak sizinti olur.
-        DisposableEffect(Unit) {
-            onDispose { engine.close() }
-        }
+        val state by viewModel.state.collectAsStateWithLifecycle()
+        val info by viewModel.searchInfo.collectAsStateWithLifecycle()
+        val searching by viewModel.searching.collectAsStateWithLifecycle()
 
-        var snapshot by remember { mutableStateOf(engine.snapshotJson()) }
-        var lastAction by remember { mutableStateOf("hazir") }
         var moveText by remember { mutableStateOf("e2e4") }
 
         AppContent(
-            version = remember { engineVersion() },
-            platformName = remember { getPlatform().name },
+            state = state,
+            info = info,
+            searching = searching,
             moveText = moveText,
             onMoveTextChange = { moveText = it.trim() },
-            lastAction = lastAction,
-            snapshot = snapshot,
-            onPlay = {
-                // sanFor HAMLE OYNANMADAN once sorulur -- sonra sorsak
-                // pozisyon degismis olurdu ve yanlis cevap alirdik.
-                val san = engine.sanFor(moveText)
-                val ok = engine.makeMove(moveText)
-                lastAction = if (ok) {
-                    "makeMove($moveText) = true   SAN: $san"
-                } else {
-                    "makeMove($moveText) = false  -- legal degil"
-                }
-                snapshot = engine.snapshotJson()
-            },
-            onUndo = {
-                val ok = engine.undo()
-                lastAction = "undo() = $ok"
-                snapshot = engine.snapshotJson()
-            },
-            onNewGame = {
-                val ok = engine.newGame("")
-                lastAction = "newGame() = $ok"
-                snapshot = engine.snapshotJson()
-            },
+            onPlay = { viewModel.play(moveText) },
+            onUndo = viewModel::undo,
+            onNewGame = viewModel::newGame,
+            onEngineMove = { viewModel.engineMove(timeMs = 1000) },
+            onStop = viewModel::stopSearch,
+            onLevel = viewModel::setSkillLevel,
         )
     }
 }
 
 @Composable
 fun AppContent(
-    version: String,
-    platformName: String,
+    state: EngineUiState,
+    info: SearchInfo,
+    searching: Boolean,
     moveText: String,
     onMoveTextChange: (String) -> Unit,
-    lastAction: String,
-    snapshot: String,
     onPlay: () -> Unit,
     onUndo: () -> Unit,
     onNewGame: () -> Unit,
+    onEngineMove: () -> Unit,
+    onStop: () -> Unit,
+    onLevel: (Int) -> Unit,
 ) {
+    val snapshot = state.snapshot
+
     Column(
         modifier = Modifier
             .safeContentPadding()
@@ -115,11 +97,36 @@ fun AppContent(
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
     ) {
-        Text(version, style = MaterialTheme.typography.titleMedium)
-        Text(platformName, style = MaterialTheme.typography.bodySmall)
+        Text(state.version, style = MaterialTheme.typography.titleMedium)
+
+        Spacer(Modifier.height(16.dp))
+
+        // ---- pozisyon ----
+        Field("Sira", if (snapshot.side == Side.WHITE) "beyaz" else "siyah")
+        Field("Durum", statusText(snapshot.status))
+        Field("Sah altinda", if (snapshot.inCheck) "evet" else "hayir")
+        Field("Legal hamle", snapshot.legal.size.toString())
+        Field("Degerlendirme", evalText(state.evaluation))
+        Field("Seviye", "${EngineViewModel.levelName(state.skillLevel)} (${state.skillLevel})")
+
+        Spacer(Modifier.height(12.dp))
+
+        Text("FEN", style = MaterialTheme.typography.labelMedium)
+        Text(snapshot.fen, style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace)
+
+        Spacer(Modifier.height(12.dp))
+
+        Text("Hamleler", style = MaterialTheme.typography.labelMedium)
+        Text(
+            text = if (snapshot.history.isEmpty()) "-" else snapshot.history.joinToString(" "),
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+        )
 
         Spacer(Modifier.height(20.dp))
 
+        // ---- elle hamle ----
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -130,75 +137,142 @@ fun AppContent(
                 onValueChange = onMoveTextChange,
                 label = { Text("UCI hamle") },
                 singleLine = true,
+                enabled = !searching,
                 modifier = Modifier.weight(1f),
             )
-            Button(onClick = onPlay) { Text("Oyna") }
+            Button(onClick = onPlay, enabled = !searching) { Text("Oyna") }
         }
 
         Spacer(Modifier.height(8.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onUndo) { Text("Geri al") }
-            Button(onClick = onNewGame) { Text("Yeni oyun") }
+            OutlinedButton(onClick = onUndo, enabled = !searching) { Text("Geri al") }
+            OutlinedButton(onClick = onNewGame, enabled = !searching) { Text("Yeni oyun") }
         }
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(16.dp))
 
-        Text("Son islem", style = MaterialTheme.typography.labelMedium)
+        // ---- motor ----
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onEngineMove, enabled = !searching) { Text("Motor oynasin") }
+            Button(onClick = onStop, enabled = searching) { Text("Durdur") }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { onLevel(0) }, enabled = !searching) { Text("Acemi") }
+            OutlinedButton(onClick = { onLevel(8) }, enabled = !searching) { Text("Orta") }
+            OutlinedButton(onClick = { onLevel(20) }, enabled = !searching) { Text("Tam guc") }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ---- canli arama bilgisi ----
         Text(
-            text = lastAction,
+            text = if (searching) "Motor dusunuyor..." else "Son arama",
+            style = MaterialTheme.typography.labelMedium,
+        )
+        Text(
+            text = infoText(info),
             style = MaterialTheme.typography.bodyMedium,
             fontFamily = FontFamily.Monospace,
         )
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(16.dp))
 
-        Text("snapshot (ham JSON)", style = MaterialTheme.typography.labelMedium)
+        Text("Son islem", style = MaterialTheme.typography.labelMedium)
         Text(
-            text = snapshot,
+            text = state.lastAction,
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,
         )
     }
 }
 
-private const val PREVIEW_SNAPSHOT =
-    "{\"fen\":\"rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2\"," +
-        "\"side\":\"w\",\"inCheck\":false,\"status\":\"ongoing\"," +
-        "\"legal\":[\"a2a3\",\"a2a4\",\"b2b3\"],\"history\":[\"e4\",\"e5\"]}"
+@Composable
+private fun Field(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(0.4f),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.weight(0.6f),
+        )
+    }
+}
+
+// Bu metinler Faz 6'da sozluge tasinacak (mimari kural 7).
+private fun statusText(status: GameStatus): String = when (status) {
+    GameStatus.ONGOING -> "devam ediyor"
+    GameStatus.CHECKMATE -> "MAT"
+    GameStatus.STALEMATE -> "pat"
+    GameStatus.DRAW_FIFTY -> "beraberlik (50 hamle)"
+    GameStatus.DRAW_REPETITION -> "beraberlik (tekrar)"
+    GameStatus.DRAW_MATERIAL -> "beraberlik (yetersiz materyal)"
+}
+
+private fun evalText(evaluation: Evaluation): String =
+    if (evaluation.hasMate) "mat ${evaluation.mateIn}"
+    else "${evaluation.scoreCp} cp"
+
+private fun infoText(info: SearchInfo): String {
+    if (info.depth == 0 && info.nodes == 0L) return "-"
+    val score = if (info.hasMate) "mat ${info.mateIn}" else "${info.scoreCp} cp"
+    return "derinlik ${info.depth}/${info.selDepth}  $score  " +
+        "${info.nodes} dugum  ${info.timeMs} ms  ${info.nodesPerSecond} d/sn"
+}
+
+// ------------------------------------------------------------
+//  Onizlemeler -- ViewModel'e hic dokunmadan
+// ------------------------------------------------------------
+
+private val PREVIEW_STATE = EngineUiState(
+    version = "cpp-chess-engine 1.0 (C++17)",
+    snapshot = Snapshot(
+        fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2",
+        side = Side.WHITE,
+        status = GameStatus.ONGOING,
+        legal = List(29) { "" },
+        history = listOf("e4", "e5"),
+    ),
+    evaluation = Evaluation(scoreCp = 34),
+    lastAction = "motor oynadi: g1f3   SAN: Nf3",
+)
 
 @Preview(showBackground = true)
 @Composable
-private fun AppContentPreview() {
+private fun AppContentIdlePreview() {
     MaterialTheme {
         AppContent(
-            version = "cpp-chess-engine 1.0 (C++17)",
-            platformName = "Android 36",
+            state = PREVIEW_STATE,
+            info = SearchInfo(depth = 12, selDepth = 18, scoreCp = 34,
+                nodes = 412_000, timeMs = 1000),
+            searching = false,
             moveText = "e2e4",
-            onMoveTextChange = {},
-            lastAction = "makeMove(e7e5) = true   SAN: e5",
-            snapshot = PREVIEW_SNAPSHOT,
-            onPlay = {},
-            onUndo = {},
-            onNewGame = {},
+            onMoveTextChange = {}, onPlay = {}, onUndo = {}, onNewGame = {},
+            onEngineMove = {}, onStop = {}, onLevel = {},
         )
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-private fun AppContentRejectedPreview() {
+private fun AppContentSearchingPreview() {
     MaterialTheme {
         AppContent(
-            version = "cpp-chess-engine 1.0 (C++17)",
-            platformName = "Android 36",
-            moveText = "e2e5",
-            onMoveTextChange = {},
-            lastAction = "makeMove(e2e5) = false  -- legal degil",
-            snapshot = PREVIEW_SNAPSHOT,
-            onPlay = {},
-            onUndo = {},
-            onNewGame = {},
+            state = PREVIEW_STATE.copy(lastAction = "hazir"),
+            info = SearchInfo(depth = 7, selDepth = 11, scoreCp = 18,
+                nodes = 96_000, timeMs = 240),
+            searching = true,
+            moveText = "e2e4",
+            onMoveTextChange = {}, onPlay = {}, onUndo = {}, onNewGame = {},
+            onEngineMove = {}, onStop = {}, onLevel = {},
         )
     }
 }
