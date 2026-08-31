@@ -16,9 +16,11 @@
 
 #include "chess_c_api.h"
 
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <thread>
 
 namespace {
 
@@ -115,6 +117,67 @@ int main() {
     check("gecersiz FEN sonrasi baslangic pozisyonu",
           contains(snap, "\"fen\":\"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\""));
 
+    // ---------- degerlendirme ----------
+    check("new_game(baslangic)", chess_new_game(e, "") == 1);
+    const char* ev = chess_evaluate_json(e);
+    check("evaluate bicimi dogru",
+          contains(ev, "\"scoreCp\":") && contains(ev, "\"mateIn\":"));
+    check("baslangicta zorunlu mat yok", contains(ev, "\"mateIn\":0"));
+
+    // ---------- acilis kitabi ----------
+    // Kitap yuklenmedi; gezgin bos donmeli, cokmemeli.
+    check("kitap yuklu degil", chess_is_book_loaded(e) == 0);
+    check("kitapsiz book_moves bos", contains(chess_book_moves_json(e), "\"moves\":[]"));
+
+    // ---------- ayarlar ----------
+    chess_set_skill_level(e, 8);
+    check("skill level 8 yazilip okundu", chess_get_skill_level(e) == 8);
+    chess_set_skill_level(e, 20);
+    check("skill level 20 yazilip okundu", chess_get_skill_level(e) == 20);
+    chess_set_hash_mb(e, 16);      // cokmemeli
+    chess_set_use_book(e, 0);      // cokmemeli
+
+    // ---------- arama ----------
+    const std::string best = chess_best_move(e, 300, 0);
+    check("best_move bir hamle dondurdu", best.size() >= 4);
+    check("best_move legal listede",
+          contains(chess_snapshot_json(e), ("\"" + best + "\"").c_str()));
+
+    check("info depth > 0",  chess_info_depth(e) > 0);
+    check("info nodes > 0",  chess_info_nodes(e) > 0);
+    check("last_depth > 0",  chess_last_depth(e) > 0);
+
+    // ---------- multi-PV ----------
+    const char* multi = chess_best_moves_json(e, 3, 300, 0);
+    check("best_moves bicimi dogru",
+          contains(multi, "\"moves\":[{\"uci\":") &&
+          contains(multi, "\"scoreCp\":") &&
+          contains(multi, "\"pv\":["));
+
+    // ---------- mat tespiti ----------
+    // 6k1/5ppp/8/8/8/8/8/4R1K1 w - - 0 1 -> Re8 mat.
+    check("new_game(mat-1 FEN)",
+          chess_new_game(e, "6k1/5ppp/8/8/8/8/8/4R1K1 w - - 0 1") == 1);
+    const char* mateLine = chess_best_moves_json(e, 1, 500, 0);
+    check("mat-1 bulundu (mateIn 1)", contains(mateLine, "\"mateIn\":1"));
+    check("mat hamlesi e1e8", contains(mateLine, "\"uci\":\"e1e8\""));
+
+    // ---------- stop baska is parcacigindan ----------
+    // Motorun tek is parcacigi guvenli olmayan yuzeyinde stop() istisnadir.
+    // 5 saniyelik bir arama 200 ms sonra kesilmeli.
+    chess_new_game(e, "");
+    {
+        const auto started = std::chrono::steady_clock::now();
+        std::thread worker([&] { chess_best_move(e, 5000, 0); });
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        chess_stop(e);
+        worker.join();
+        const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - started).count();
+        std::printf("  (arama %lld ms sonra kesildi)\n", static_cast<long long>(elapsedMs));
+        check("stop aramayi kesti (< 2000 ms)", elapsedMs < 2000);
+    }
+
     // ---------- NULL guvenligi ----------
     chess_destroy(e);
     chess_destroy(nullptr);
@@ -123,6 +186,11 @@ int main() {
     check("NULL tutamac make_move -> 0", chess_make_move(nullptr, "e2e4") == 0);
     check("NULL tutamac undo -> 0",      chess_undo(nullptr) == 0);
     check("NULL uci san_for -> bos",     std::strlen(chess_san_for(nullptr, nullptr)) == 0);
+    check("NULL best_move -> bos",       std::strlen(chess_best_move(nullptr, 10, 0)) == 0);
+    check("NULL best_moves -> bos liste",
+          std::strcmp(chess_best_moves_json(nullptr, 3, 10, 0), "{\"moves\":[]}") == 0);
+    check("NULL info_depth -> 0",        chess_info_depth(nullptr) == 0);
+    chess_stop(nullptr);   // cokmemeli
 
     std::printf("\ncapitest %d/%d\n", checks - failures, checks);
     return failures == 0 ? 0 : 1;
