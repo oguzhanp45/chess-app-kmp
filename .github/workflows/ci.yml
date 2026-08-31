@@ -29,7 +29,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # -DCHESS_BUILD_TOOLS=OFF zorunlu: engine/ klasoru motor deposunun
       # yalnizca src/ kismi, tests/ ve uci/ kopyalanmadi.
@@ -46,14 +46,14 @@ jobs:
     name: Android (APK + NDK)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: APK derle
         run: ./gradlew :androidApp:assembleDebug --stacktrace
@@ -70,14 +70,14 @@ jobs:
     name: iOS (framework baglaniyor mu)
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # Baglama (link) derlemeyi de kapsar. Iki hedef: gercek cihaz ve
       # Apple Silicon simulatoru -- wizard ikisini de acti.
