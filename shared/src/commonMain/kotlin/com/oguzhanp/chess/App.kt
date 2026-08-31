@@ -16,8 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.resources.painterResource
 
-import mychessappkmp.shared.generated.resources.Res
-import mychessappkmp.shared.generated.resources.compose_multiplatform
+import com.oguzhanp.chess.resources.Res
+import com.oguzhanp.chess.resources.compose_multiplatform
 
 @Composable
 @Preview

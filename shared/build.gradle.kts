@@ -43,6 +43,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
+            implementation(project(":engine-android"))
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -58,6 +59,12 @@ kotlin {
             implementation(libs.kotlin.test)
         }
     }
+}
+
+// Uretilen Res sinifinin paketi normalde rootProject.name'den
+// turetiliyor; bunu sabitleyerek proje adindan bagimsiz kiliyoruz.
+compose.resources {
+    packageOfResClass = "com.oguzhanp.chess.resources"
 }
 
 dependencies {
