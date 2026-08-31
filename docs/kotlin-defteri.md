@@ -260,3 +260,137 @@ tamami gonderilmeli.
 **Yeniden adlandirmanin yan etkilerini onceden dusun.**
 `rootProject.name` degisikligi zararsiz gorunuyordu ama uretilen kaynak
 sinifinin paketini kirdi.
+
+---
+
+## Faz 1.5 - 1.6 — Koprüyü Kotlin'e baglamak
+
+### Dort katman, her biri tek is yapar
+
+```
+App.kt (commonMain)          ekran; JNI'i de cinterop'u da bilmez
+    v  expect/actual
+ChessEngine (androidMain)    tutamaci saklar, omru yonetir
+    v
+NativeBridge (androidMain)   external fun bildirimleri
+    v  JNI
+chessjni.cpp                 tip cevirisi; satranc mantigi YOK
+    v
+chess_c_api.cpp (bridge/)    EngineApi'yi extern "C" ile sarar
+    v
+EngineApi (engine/)          gercek satranc
+```
+
+### JNI katmanini kim yaziyor
+
+**Biz.** Derleyici uretmiyor. Uretilen tek sey ISIM: JNI belirtimi paket +
+sinif + metot adindan sembol adini mekanik olarak turetiyor.
+
+```
+com.oguzhanp.chess.engine.NativeBridge.makeMove
+    -> Java_com_oguzhanp_chess_engine_NativeBridge_makeMove
+```
+
+Android Studio'da `external fun` satirinda Alt+Enter -> "Create JNI function"
+dogru imzali C++ taslagini yaziyor; govdeyi biz dolduruyoruz.
+
+Bu bagin DERLEME sirasinda kontrol edilmedigine dikkat: uyusmazlik calisma
+aninda `UnsatisfiedLinkError` olarak cikiyor. Kotlin sinif adini degistirip
+C++ tarafini unutursan uygulama derlenir ama acilista patlar.
+
+Ilginc olan asimetri: **iOS tarafinda derleyici gercekten uretiyor.** cinterop
+`chess_c_api.h`'yi okuyup Kotlin bildirimlerini kendisi cikariyor. Shim
+yazilmiyor. Asil emek Android'de.
+
+(Alternatif: `RegisterNatives` ile `JNI_OnLoad` icinde tablo vermek.
+Uyusmazlik kutuphane yuklenirken patlar, ilk cagride degil. Simdilik ad
+tabanli yontem yeterli.)
+
+### Tutamac neden Long
+
+`chess_create()` C++ tarafinda `new chess_engine()` yapip adresini donduruyor.
+Kotlin bunu `Long` olarak sakliyor ama icine hic bakmiyor -- yalnizca "hangi
+motor ornegi" diye geri veriyor. Vestiyer fisi gibi. 64 bitlik `jlong` hem
+arm64 hem x86_64 isaretcisini tasiyor.
+
+`close()` cagrilmazsa C++ nesnesi sizar; Compose tarafinda `DisposableEffect`
+ile bagladik. `close()` sonrasi bir cagri gelirse serbest birakilmis bellege
+erisilir ve uygulama sebebi anlasilmaz sekilde coker -- `alive()` bunu
+anlasilir bir Kotlin hatasina ceviriyor.
+
+### JniString
+
+`GetStringUTFChars` kopya yapabiliyor ve `ReleaseStringUTFChars` cagrilmazsa
+sizinti oluyor. Her fonksiyonda elle yazmak yerine yikicida serbest birakan
+kucuk bir RAII sinifi koyduk. Artik `JniString value(env, uci);` yeterli;
+erken `return` yolunda bir sey unutma riski yok.
+
+### Neden ham JSON gosteriyoruz
+
+Ekranda snapshot ham metin olarak duruyor. Ayristirmayi Faz 2'ye biraktik:
+burada ayristirsak bir hata ciktiginda "koprü mu bozuk, ayristirici mi bozuk"
+diye tahmin yurutmek zorunda kalirdik. Faz 1'in tamami bu tahmini onlemek
+uzerine kurulu.
+
+---
+
+## Faz 1.7 — CI
+
+Uc is:
+
+| Is | Nerede | Ne kanitliyor |
+|---|---|---|
+| `capitest` | Ubuntu + Windows + macOS | C yuzeyi uc derleyicide de dogru (35 kontrol) |
+| `android` | Ubuntu | APK derleniyor VE `.so` paketin icinde |
+| `ios` | macOS | `iosMain` derleniyor, framework baglaniyor |
+
+`ios` isi Mac'i olmayan gelistirici icin: depo genel oldugu icin macOS
+kosucusu ucretsiz. Arayuzu goremiyoruz ama iosMain'in bozulmadigini her
+commit'te ogreniyoruz.
+
+`android` isindeki `unzip -l | grep` adimi bilincli: "BUILD SUCCESSFUL"
+`.so`'nun paketlendigini kanitlamiyor. Derlenip paketlenmeyen durumlar oluyor,
+o yuzden ciktinin kendisine bakiyoruz.
+
+### capitest'i ctest'e baglamak
+
+Windows'ta CMake cikti klasorune `Release/` ekliyor, Linux/macOS'ta eklemiyor.
+`add_test(NAME capitest COMMAND capitest)` + `enable_testing()` ile `ctest` bu
+farki kendi cozuyor ve uc isletim sisteminde tek komut calisiyor:
+
+```
+ctest --test-dir build-desktop -C Release --output-on-failure
+```
+
+`add_test` YAPILANDIRMA aninda `CTestTestfile.cmake`'e yaziliyor. Var olan bir
+build klasorunde `ctest` "No tests were found" derse sebebi budur -- `cmake -B`
+tekrar calistirilmali.
+
+### CI'in yakaladigi ilk hata
+
+Ilk kosuda `android` 126, `ios` 1 ile dustu. Tek sebep vardi:
+`./gradlew: Permission denied`. Windows'ta dosya sisteminde calistirma biti
+yok, o yuzden `chmod` git'e islemiyor:
+
+```
+git update-index --chmod=+x gradlew
+```
+
+Bu, motor fazinda `run-tests.sh` ile yasanan hatanin aynisi. Cikis kodundan
+sebep cikarmaya calismak yaniltti: 126 "calistirilamaz" demek ama cok satirli
+bir `run` blogunda ayni hata 1 olarak raporlanabiliyor. Log'a bakmak gerekiyor.
+
+---
+
+## Faz 1 kapanisi
+
+Koprü ayakta ve her iki uctan da dogrulanmis durumda:
+
+- C yuzeyi uc isletim sisteminde 35 kontrolu geciyor
+- Motor Android icin derlenip APK'ya giriyor (arm64-v8a, x86_64)
+- Kotlin motoru gercekten suruyor: hamle oynaniyor, geri aliniyor, legal
+  olmayan hamle reddediliyor ve tahta degismiyor
+- iOS hedefleri derleniyor
+- Bunlarin hepsi her commit'te otomatik dogrulaniyor
+
+Faz 1'in kurali "koprü calismadan ustune bir sey koyma" idi. Artik koyabiliriz.
