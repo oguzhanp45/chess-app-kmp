@@ -28,45 +28,88 @@ import com.oguzhanp.chess.engine.engineVersion
 // Dikkat: bu dosya commonMain'de, yani JNI'i de cinterop'u da bilmiyor.
 // engineVersion() cagrisinin altinda Android'de JNI, iOS'ta (ileride)
 // cinterop var; ekran kodu ikisini de gormuyor. Mimari kural 5.
+//
+// Yapi: App() durumu toplar, AppContent() yalnizca aldigi parametreleri
+// cizer. Bu ayrim sayesinde AppContent kopruye hic dokunmadan
+// onizlenebiliyor ve test edilebiliyor.
 
 @Composable
-@Preview
 fun App() {
     MaterialTheme {
         // remember: yeniden cizimlerde kopruye tekrar gidilmesin.
         val version = remember { engineVersion() }
         val legalMoves = remember { engineSelfTest() }
+        val platformName = remember { getPlatform().name }
 
-        Column(
-            modifier = Modifier
-                .safeContentPadding()
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = version,
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center,
-            )
+        AppContent(
+            version = version,
+            legalMoves = legalMoves,
+            platformName = platformName,
+        )
+    }
+}
 
-            Text(
-                text = if (legalMoves == 20) {
-                    "Oz test: $legalMoves legal hamle -- kopru calisiyor"
-                } else {
-                    "Oz test BASARISIZ: $legalMoves (20 bekleniyordu)"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 12.dp),
-            )
+@Composable
+fun AppContent(
+    version: String,
+    legalMoves: Int,
+    platformName: String,
+) {
+    Column(
+        modifier = Modifier
+            .safeContentPadding()
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = version,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+        )
 
-            Text(
-                text = getPlatform().name,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 24.dp),
-            )
-        }
+        Text(
+            text = if (legalMoves == 20) {
+                "Oz test: $legalMoves legal hamle -- kopru calisiyor"
+            } else {
+                "Oz test BASARISIZ: $legalMoves (20 bekleniyordu)"
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+
+        Text(
+            text = platformName,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 24.dp),
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AppContentPreview() {
+    MaterialTheme {
+        AppContent(
+            version = "cpp-chess-engine 1.0 (C++17)",
+            legalMoves = 20,
+            platformName = "Android 36",
+        )
+    }
+}
+
+// Oz test basarisiz oldugunda ekranin nasil gorundugunu de onizleyelim --
+// hata halini gormeden dogru yazdigimizdan emin olamayiz.
+@Preview(showBackground = true)
+@Composable
+private fun AppContentFailurePreview() {
+    MaterialTheme {
+        AppContent(
+            version = "cpp-chess-engine 1.0 (C++17)",
+            legalMoves = -1,
+            platformName = "Android 36",
+        )
     }
 }
