@@ -42,4 +42,35 @@ object NativeBridge {
     external fun makeMove(handle: Long, uci: String): Boolean
     external fun undo(handle: Long): Boolean
     external fun sanFor(handle: Long, uci: String): String
+
+    // ---- arama: BLOKE EDER, arka planda cagrilmali ----
+    external fun bestMove(handle: Long, timeMs: Int, maxDepth: Int): String
+    external fun bestMovesJson(handle: Long, n: Int, timeMs: Int, maxDepth: Int): String
+    external fun evaluateJson(handle: Long): String
+    external fun bookMovesJson(handle: Long): String
+
+    // Arama surerken baska bir is parcacigindan cagrilabilir.
+    external fun stop(handle: Long)
+
+    // ---- canli arama bilgisi: arama surerken cagrilabilir ----
+    // Motora dokunmuyorlar, C katmanindaki atomik alanlari okuyorlar.
+    external fun infoDepth(handle: Long): Int
+    external fun infoSelDepth(handle: Long): Int
+    external fun infoScoreCp(handle: Long): Int
+    external fun infoMateIn(handle: Long): Int
+    external fun infoNodes(handle: Long): Long
+    external fun infoTimeMs(handle: Long): Int
+
+    // ---- son aramanin sonucu ----
+    external fun lastScore(handle: Long): Int
+    external fun lastDepth(handle: Long): Int
+    external fun lastSkillLoss(handle: Long): Int
+
+    // ---- ayarlar ----
+    external fun setSkillLevel(handle: Long, level: Int)
+    external fun getSkillLevel(handle: Long): Int
+    external fun setHashMb(handle: Long, mb: Int)
+    external fun setUseBook(handle: Long, on: Boolean)
+    external fun loadBookFromMemory(handle: Long, bytes: ByteArray): Boolean
+    external fun isBookLoaded(handle: Long): Boolean
 }

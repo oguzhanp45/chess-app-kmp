@@ -66,6 +66,12 @@ jobs:
           unzip -l "$APK" | grep 'lib/arm64-v8a/libchessjni.so'
           unzip -l "$APK" | grep 'lib/x86_64/libchessjni.so'
 
+      # JNI bagi calisma aninda kuruluyor: Kotlin'de bir ad degisip C++
+      # tarafi unutulursa derleme gecer, uygulama ilk cagride coker.
+      # Bu adim o hatayi burada yakaliyor.
+      - name: JNI sembolleri eslesiyor mu
+        run: ./tools/check-jni-symbols.sh
+
   ios:
     name: iOS (framework baglaniyor mu)
     runs-on: macos-latest

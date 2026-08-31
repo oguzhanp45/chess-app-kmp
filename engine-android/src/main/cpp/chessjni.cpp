@@ -133,3 +133,149 @@ Java_com_oguzhanp_chess_engine_NativeBridge_sanFor(JNIEnv* env, jobject /*thiz*/
     JniString value(env, uci);
     return env->NewStringUTF(chess_san_for(toEngine(handle), value.c_str()));
 }
+
+// ------------------------------------------------------------
+//  Arama -- BLOKE EDER, Kotlin tarafinda arka planda cagrilmali
+// ------------------------------------------------------------
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_bestMove(JNIEnv* env, jobject /*thiz*/,
+                                                     jlong handle, jint timeMs,
+                                                     jint maxDepth) {
+    return env->NewStringUTF(chess_best_move(toEngine(handle), timeMs, maxDepth));
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_bestMovesJson(JNIEnv* env, jobject /*thiz*/,
+                                                          jlong handle, jint n,
+                                                          jint timeMs, jint maxDepth) {
+    return env->NewStringUTF(chess_best_moves_json(toEngine(handle), n, timeMs, maxDepth));
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_evaluateJson(JNIEnv* env, jobject /*thiz*/,
+                                                         jlong handle) {
+    return env->NewStringUTF(chess_evaluate_json(toEngine(handle)));
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_bookMovesJson(JNIEnv* env, jobject /*thiz*/,
+                                                          jlong handle) {
+    return env->NewStringUTF(chess_book_moves_json(toEngine(handle)));
+}
+
+// Arama surerken BASKA BIR IS PARCACIGINDAN cagrilir. Motor tarafinda
+// yalnizca atomik bir bayrak set ediyor, o yuzden guvenli.
+extern "C" JNIEXPORT void JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_stop(JNIEnv* /*env*/, jobject /*thiz*/,
+                                                 jlong handle) {
+    chess_stop(toEngine(handle));
+}
+
+// ------------------------------------------------------------
+//  Canli arama bilgisi -- arama surerken cagrilabilir
+// ------------------------------------------------------------
+// Bunlar motora dokunmuyor; C katmanindaki atomik alanlari okuyorlar.
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_infoDepth(JNIEnv*, jobject, jlong handle) {
+    return chess_info_depth(toEngine(handle));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_infoSelDepth(JNIEnv*, jobject, jlong handle) {
+    return chess_info_sel_depth(toEngine(handle));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_infoScoreCp(JNIEnv*, jobject, jlong handle) {
+    return chess_info_score_cp(toEngine(handle));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_infoMateIn(JNIEnv*, jobject, jlong handle) {
+    return chess_info_mate_in(toEngine(handle));
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_infoNodes(JNIEnv*, jobject, jlong handle) {
+    return static_cast<jlong>(chess_info_nodes(toEngine(handle)));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_infoTimeMs(JNIEnv*, jobject, jlong handle) {
+    return chess_info_time_ms(toEngine(handle));
+}
+
+// ------------------------------------------------------------
+//  Son aramanin sonucu
+// ------------------------------------------------------------
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_lastScore(JNIEnv*, jobject, jlong handle) {
+    return chess_last_score(toEngine(handle));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_lastDepth(JNIEnv*, jobject, jlong handle) {
+    return chess_last_depth(toEngine(handle));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_lastSkillLoss(JNIEnv*, jobject, jlong handle) {
+    return chess_last_skill_loss(toEngine(handle));
+}
+
+// ------------------------------------------------------------
+//  Ayarlar
+// ------------------------------------------------------------
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_setSkillLevel(JNIEnv*, jobject,
+                                                          jlong handle, jint level) {
+    chess_set_skill_level(toEngine(handle), level);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_getSkillLevel(JNIEnv*, jobject, jlong handle) {
+    return chess_get_skill_level(toEngine(handle));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_setHashMb(JNIEnv*, jobject,
+                                                      jlong handle, jint mb) {
+    chess_set_hash_mb(toEngine(handle), mb);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_setUseBook(JNIEnv*, jobject,
+                                                       jlong handle, jboolean on) {
+    chess_set_use_book(toEngine(handle), on == JNI_TRUE ? 1 : 0);
+}
+
+// Kitap APK varligi oldugu icin Kotlin tarafinda ByteArray olarak okunur.
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_loadBookFromMemory(JNIEnv* env, jobject /*thiz*/,
+                                                               jlong handle,
+                                                               jbyteArray bytes) {
+    if (bytes == nullptr) return JNI_FALSE;
+
+    const jsize size = env->GetArrayLength(bytes);
+    jbyte* data = env->GetByteArrayElements(bytes, nullptr);
+    if (data == nullptr) return JNI_FALSE;
+
+    const int ok = chess_load_book_from_memory(
+        toEngine(handle),
+        reinterpret_cast<const unsigned char*>(data),
+        static_cast<size_t>(size));
+
+    // JNI_ABORT: diziyi degistirmedik, JVM'e geri yazmasina gerek yok.
+    env->ReleaseByteArrayElements(bytes, data, JNI_ABORT);
+
+    return ok != 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_oguzhanp_chess_engine_NativeBridge_isBookLoaded(JNIEnv*, jobject, jlong handle) {
+    return chess_is_book_loaded(toEngine(handle)) != 0 ? JNI_TRUE : JNI_FALSE;
+}
