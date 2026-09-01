@@ -1,284 +1,154 @@
 package com.oguzhanp.chess
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-
-import com.oguzhanp.chess.engine.Evaluation
-import com.oguzhanp.chess.engine.GameStatus
-import com.oguzhanp.chess.engine.SearchInfo
-import com.oguzhanp.chess.engine.Side
-import com.oguzhanp.chess.engine.Snapshot
+import com.oguzhanp.chess.data.rememberSettingsRepository
+import com.oguzhanp.chess.debug.EngineTestScreen
+import com.oguzhanp.chess.onboarding.OnboardingScreen
+import com.oguzhanp.chess.resources.Res
+import com.oguzhanp.chess.resources.chess_logo
+import com.oguzhanp.chess.theme.ChessTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 
 // ============================================================
-//  Faz 2.4 -- motor dogrulama ekrani
+//  App -- uygulamanin kok bileseni
 // ============================================================
-// Bu ekran GECICIDIR ve tasarim degildir. Tek isi motorun coroutine
-// sarmalayicisinin dogru calistigini gostermek: motor dusunurken arayuz
-// donmuyor mu, canli derinlik akiyor mu, durdurma calisiyor mu.
+// Iki platformun giris noktasi da burayi cagiriyor:
+//   Android -> MainActivity
+//   iOS     -> MainViewController
 //
-// Gercek arayuz Faz 3'te (tahta) ve Faz 5'te (navigasyon) yapilacak;
-// oraya gelmeden once tasarim sorulari sorulacak.
+// Tek isi: temayi kurmak ve HANGI ekranin gosterilecegine karar vermek.
+// Ekranlarin kendi ici bu dosyayi ilgilendirmiyor.
 //
-// Yapi: App() ViewModel'i baglar, AppContent() yalnizca aldigini cizer.
-
-// Motorun dusunme suresi. Seviye 20'de derinlik siniri yok, o yuzden
-// sure ne kadar uzunsa o kadar derine iner. Dusuk seviyelerde derinlik
-// tavani devrede oldugu icin bu sayinin etkisi yok -- motor yine aninda
-// oynar. Faz 4'te saat gelince bu deger kalan sureden hesaplanacak.
-private const val ENGINE_THINK_MS = 4000
+// NAVIGATION YOK, bilerek. Su an iki hedef var ve onboarding bittikten
+// sonra ona geri donulmuyor -- yani bir geri yigini gerekmiyor.
+// Navigation Faz 5'te, bes sekme ve her sekmenin kendi yigini
+// geldiginde eklenecek.
 
 @Composable
 fun App() {
-    MaterialTheme {
-        val viewModel: EngineViewModel = viewModel { EngineViewModel() }
+    ChessTheme {
+        val settings = rememberSettingsRepository()
+        val scope = rememberCoroutineScope()
 
-        val state by viewModel.state.collectAsStateWithLifecycle()
-        val info by viewModel.searchInfo.collectAsStateWithLifecycle()
-        val searching by viewModel.searching.collectAsStateWithLifecycle()
+        // UC durum var, iki degil:
+        //   null  -> diskten henuz okunmadi
+        //   false -> tanitim gosterilecek
+        //   true  -> uygulamaya girilecek
+        //
+        // null halini atlarsak once ana ekran cizilir, 50 ms sonra deger
+        // gelir ve ekran tanitima sicrar. Kullanici bunu TITREME olarak
+        // gorur. RN surumunde tahtada yasadigimiz sorunun ayni sinifi:
+        // durum gec geldigi icin ekran iki kez ciziliyor.
+        var onboarded by remember { mutableStateOf<Boolean?>(null) }
 
-        var moveText by remember { mutableStateOf("e2e4") }
+        // Acilis animasyonu bitti mi. Yapay bir gecikme DEGIL: uygulama
+        // iki sart birden saglaninca geciyor -- veri geldi VE animasyon
+        // bitti. Veri yavas gelirse fazladan beklemiyoruz, hizli gelirse
+        // animasyon yarida kesilmiyor.
+        var splashFinished by remember { mutableStateOf(false) }
 
-        AppContent(
-            state = state,
-            info = info,
-            searching = searching,
-            moveText = moveText,
-            onMoveTextChange = { moveText = it.trim() },
-            onPlay = { viewModel.play(moveText) },
-            onUndo = viewModel::undo,
-            onNewGame = viewModel::newGame,
-            onEngineMove = { viewModel.engineMove(timeMs = ENGINE_THINK_MS) },
-            onStop = viewModel::stopSearch,
-            onLevel = viewModel::setSkillLevel,
-        )
-    }
-}
+        LaunchedEffect(settings) {
+            settings.isOnboarded.collect { onboarded = it }
+        }
 
-@Composable
-fun AppContent(
-    state: EngineUiState,
-    info: SearchInfo,
-    searching: Boolean,
-    moveText: String,
-    onMoveTextChange: (String) -> Unit,
-    onPlay: () -> Unit,
-    onUndo: () -> Unit,
-    onNewGame: () -> Unit,
-    onEngineMove: () -> Unit,
-    onStop: () -> Unit,
-    onLevel: (Int) -> Unit,
-) {
-    val snapshot = state.snapshot
+        val ready = onboarded != null && splashFinished
 
-    Column(
-        modifier = Modifier
-            .safeContentPadding()
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-    ) {
-        Text(state.version, style = MaterialTheme.typography.titleMedium)
+        when {
+            !ready -> SplashScreen(onFinished = { splashFinished = true })
 
-        Spacer(Modifier.height(16.dp))
-
-        // ---- pozisyon ----
-        Field("Sira", if (snapshot.side == Side.WHITE) "beyaz" else "siyah")
-        Field("Durum", statusText(snapshot.status))
-        Field("Sah altinda", if (snapshot.inCheck) "evet" else "hayir")
-        Field("Legal hamle", snapshot.legal.size.toString())
-        Field("Degerlendirme", evalText(state.evaluation))
-        Field("Seviye", "${EngineViewModel.levelName(state.skillLevel)} (${state.skillLevel})")
-
-        Spacer(Modifier.height(12.dp))
-
-        Text("FEN", style = MaterialTheme.typography.labelMedium)
-        Text(snapshot.fen, style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace)
-
-        Spacer(Modifier.height(12.dp))
-
-        Text("Hamleler", style = MaterialTheme.typography.labelMedium)
-        Text(
-            text = if (snapshot.history.isEmpty()) "-" else snapshot.history.joinToString(" "),
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-        )
-
-        Spacer(Modifier.height(20.dp))
-
-        // ---- elle hamle ----
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedTextField(
-                value = moveText,
-                onValueChange = onMoveTextChange,
-                label = { Text("UCI hamle") },
-                singleLine = true,
-                enabled = !searching,
-                modifier = Modifier.weight(1f),
+            onboarded == false -> OnboardingScreen(
+                onFinish = { scope.launch { settings.setOnboarded(true) } },
             )
-            Button(onClick = onPlay, enabled = !searching) { Text("Oyna") }
+
+            else -> EngineTestScreen()
         }
+    }
+}
 
-        Spacer(Modifier.height(8.dp))
+// Acilis animasyonu olculeri. Toplam gorunur sure ~700 ms.
+private const val SPLASH_FADE_MS = 500
+private const val SPLASH_HOLD_MS = 200L
+private val SplashLogoSize = 112.dp
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onUndo, enabled = !searching) { Text("Geri al") }
-            OutlinedButton(onClick = onNewGame, enabled = !searching) { Text("Yeni oyun") }
+/**
+ * Acilis ekrani: logo belirip hafifce buyur, sonra devam edilir.
+ *
+ * NOT (Faz 8): Android 12'den beri SISTEMIN kendi splash'i da var --
+ * uygulama simgesi Compose baslamadan once gosteriliyor. Yani su an iki
+ * acilis ekrani ust uste biniyor. Ikisini hizalamak cila isi.
+ */
+@Composable
+private fun SplashScreen(
+    onFinished: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // Animatable: hedefe kadar olan gecisi elle surdugumuz deger.
+    // animate*AsState'ten farki, bitmesini BEKLEYEBILMEMIZ.
+    val alpha = remember { Animatable(0f) }
+    val scale = remember { Animatable(0.86f) }
+
+    LaunchedEffect(Unit) {
+        // Buyume ile solma ayni anda kossun diye biri ayri baslatiliyor.
+        launch {
+            scale.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(SPLASH_FADE_MS, easing = FastOutSlowInEasing),
+            )
         }
-
-        Spacer(Modifier.height(16.dp))
-
-        // ---- motor ----
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onEngineMove, enabled = !searching) { Text("Motor oynasin") }
-            Button(onClick = onStop, enabled = searching) { Text("Durdur") }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { onLevel(0) }, enabled = !searching) { Text("Acemi") }
-            OutlinedButton(onClick = { onLevel(8) }, enabled = !searching) { Text("Orta") }
-            OutlinedButton(onClick = { onLevel(20) }, enabled = !searching) { Text("Tam guc") }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // ---- canli arama bilgisi ----
-        Text(
-            text = if (searching) "Motor dusunuyor..." else "Son arama",
-            style = MaterialTheme.typography.labelMedium,
+        alpha.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(SPLASH_FADE_MS, easing = LinearOutSlowInEasing),
         )
-        Text(
-            text = infoText(info),
-            style = MaterialTheme.typography.bodyMedium,
-            fontFamily = FontFamily.Monospace,
-        )
+        delay(SPLASH_HOLD_MS)   // logo bir an dursun, aninda kaybolmasin
+        onFinished()
+    }
 
-        Spacer(Modifier.height(16.dp))
-
-        Text("Son islem", style = MaterialTheme.typography.labelMedium)
-        Text(
-            text = state.lastAction,
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(Res.drawable.chess_logo),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .size(SplashLogoSize)
+                .alpha(alpha.value)
+                .scale(scale.value),
         )
     }
 }
 
+@Preview
 @Composable
-private fun Field(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(0.4f),
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.weight(0.6f),
-        )
-    }
-}
-
-// Bu metinler Faz 6'da sozluge tasinacak (mimari kural 7).
-private fun statusText(status: GameStatus): String = when (status) {
-    GameStatus.ONGOING -> "devam ediyor"
-    GameStatus.CHECKMATE -> "MAT"
-    GameStatus.STALEMATE -> "pat"
-    GameStatus.DRAW_FIFTY -> "beraberlik (50 hamle)"
-    GameStatus.DRAW_REPETITION -> "beraberlik (tekrar)"
-    GameStatus.DRAW_MATERIAL -> "beraberlik (yetersiz materyal)"
-}
-
-private fun evalText(evaluation: Evaluation): String =
-    if (evaluation.hasMate) "mat ${evaluation.mateIn}"
-    else "${evaluation.scoreCp} cp"
-
-private fun infoText(info: SearchInfo): String {
-    if (info.depth == 0 && info.nodes == 0L) return "-"
-    val score = if (info.hasMate) "mat ${info.mateIn}" else "${info.scoreCp} cp"
-    return "derinlik ${info.depth}/${info.selDepth}  $score  " +
-        "${info.nodes} dugum  ${info.timeMs} ms  ${info.nodesPerSecond} d/sn"
-}
-
-// ------------------------------------------------------------
-//  Onizlemeler -- ViewModel'e hic dokunmadan
-// ------------------------------------------------------------
-
-private val PREVIEW_STATE = EngineUiState(
-    version = "cpp-chess-engine 1.0 (C++17)",
-    snapshot = Snapshot(
-        fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2",
-        side = Side.WHITE,
-        status = GameStatus.ONGOING,
-        legal = List(29) { "" },
-        history = listOf("e4", "e5"),
-    ),
-    evaluation = Evaluation(scoreCp = 34),
-    lastAction = "motor oynadi: g1f3   SAN: Nf3",
-)
-
-@Preview(showBackground = true)
-@Composable
-private fun AppContentIdlePreview() {
-    MaterialTheme {
-        AppContent(
-            state = PREVIEW_STATE,
-            info = SearchInfo(depth = 12, selDepth = 18, scoreCp = 34,
-                nodes = 412_000, timeMs = 1000),
-            searching = false,
-            moveText = "e2e4",
-            onMoveTextChange = {}, onPlay = {}, onUndo = {}, onNewGame = {},
-            onEngineMove = {}, onStop = {}, onLevel = {},
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun AppContentSearchingPreview() {
-    MaterialTheme {
-        AppContent(
-            state = PREVIEW_STATE.copy(lastAction = "hazir"),
-            info = SearchInfo(depth = 7, selDepth = 11, scoreCp = 18,
-                nodes = 96_000, timeMs = 240),
-            searching = true,
-            moveText = "e2e4",
-            onMoveTextChange = {}, onPlay = {}, onUndo = {}, onNewGame = {},
-            onEngineMove = {}, onStop = {}, onLevel = {},
-        )
+private fun SplashScreenPreview() {
+    ChessTheme {
+        SplashScreen(onFinished = {})
     }
 }

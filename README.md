@@ -136,4 +136,11 @@ CMake 3.16+ · minSdk 26
 
 ## Lisans / License
 
-Henüz belirlenmedi. / Not decided yet.
+Bu deponun kendi kodu için lisans henüz belirlenmedi.
+
+Kullanılan üçüncü taraf varlıklar ve kütüphaneler — motor (MIT),
+Material Symbols ikonları (Apache 2.0) ve diğerleri — için
+[`docs/lisanslar.md`](docs/lisanslar.md).
+
+No license decided yet for this repository's own code. For third-party
+assets and libraries see [`docs/lisanslar.md`](docs/lisanslar.md).
