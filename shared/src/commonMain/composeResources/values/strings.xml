@@ -1,0 +1,35 @@
+<resources>
+    <!--
+      Varsayilan dil: Ingilizce. Cihazin dili Turkce ise values-tr
+      kullanilir; baska bir dilse buraya dusulur.
+
+      Mimari kural 7: ekranda gorunen her metin buradan gelir.
+      Yeni bir metin yazarken once buraya, sonra values-tr'ye eklenir.
+    -->
+
+    <!-- Onboarding -->
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_back">Back</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_start">Start</string>
+
+    <string name="onboarding_title_engine">Welcome to chess</string>
+    <string name="onboarding_body_engine">Play against a strong engine. Six levels, from novice to full strength.</string>
+
+    <string name="onboarding_title_progress">Get better</string>
+    <string name="onboarding_body_progress">Puzzles, lessons and post-game analysis show you where you went wrong.</string>
+
+    <string name="onboarding_title_offline">Always with you</string>
+    <string name="onboarding_body_offline">No internet needed. Your games and progress stay on your device.</string>
+
+    <!-- Motor seviyeleri -->
+    <string name="level_novice">Novice</string>
+    <string name="level_beginner">Beginner</string>
+    <string name="level_intermediate">Intermediate</string>
+    <string name="level_good">Good</string>
+    <string name="level_hard">Hard</string>
+    <string name="level_full">Full strength</string>
+
+    <!-- Onboarding gorselleri -->
+    <string name="rating_points">%1$d points</string>
+</resources>

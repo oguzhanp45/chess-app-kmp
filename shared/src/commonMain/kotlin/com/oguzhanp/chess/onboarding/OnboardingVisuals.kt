@@ -34,7 +34,17 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import com.oguzhanp.chess.resources.Res
+import com.oguzhanp.chess.resources.level_beginner
+import com.oguzhanp.chess.resources.level_full
+import com.oguzhanp.chess.resources.level_good
+import com.oguzhanp.chess.resources.level_hard
+import com.oguzhanp.chess.resources.level_intermediate
+import com.oguzhanp.chess.resources.level_novice
+import com.oguzhanp.chess.resources.rating_points
+import com.oguzhanp.chess.theme.Corners
 import kotlin.math.roundToInt
+import org.jetbrains.compose.resources.stringResource
 
 // ============================================================
 //  Onboarding gorselleri
@@ -55,9 +65,14 @@ private val LevelBarWidth = 14.dp
 private val LevelBarMaxHeight = 96.dp
 private val LevelBarGap = 8.dp
 
-/** Motorun alti seviyesi. Faz 6'da sozluge tasinacak. */
+/** Motorun alti seviyesi. Adlar sozlukten geliyor (mimari kural 7). */
 private val levelNames = listOf(
-    "Acemi", "Baslangic", "Orta", "Iyi", "Zor", "Tam guc",
+    Res.string.level_novice,
+    Res.string.level_beginner,
+    Res.string.level_intermediate,
+    Res.string.level_good,
+    Res.string.level_hard,
+    Res.string.level_full,
 )
 
 /**
@@ -111,7 +126,7 @@ internal fun LevelsVisual(modifier: Modifier = Modifier) {
                             } else {
                                 MaterialTheme.colorScheme.primaryContainer
                             },
-                            shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp),
+                            shape = RoundedCornerShape(topStart = Corners.sm, topEnd = Corners.sm),
                         ),
                 )
             }
@@ -122,7 +137,7 @@ internal fun LevelsVisual(modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = levelNames[activeIndex],
+                text = stringResource(levelNames[activeIndex]),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
@@ -239,7 +254,7 @@ internal fun ProgressVisual(modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = "$rating puan",
+                text = stringResource(Res.string.rating_points, rating),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
@@ -285,7 +300,7 @@ internal fun BoardVisual(modifier: Modifier = Modifier) {
         Column(
             modifier = Modifier
                 .size(BoardEdge)
-                .clip(RoundedCornerShape(10.dp)),
+                .clip(RoundedCornerShape(Corners.md)),
         ) {
             repeat(BOARD_SIZE) { row ->
                 Row {

@@ -35,7 +35,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.oguzhanp.chess.resources.Res
+import com.oguzhanp.chess.resources.onboarding_back
+import com.oguzhanp.chess.resources.onboarding_body_engine
+import com.oguzhanp.chess.resources.onboarding_body_offline
+import com.oguzhanp.chess.resources.onboarding_body_progress
+import com.oguzhanp.chess.resources.onboarding_next
+import com.oguzhanp.chess.resources.onboarding_skip
+import com.oguzhanp.chess.resources.onboarding_start
+import com.oguzhanp.chess.resources.onboarding_title_engine
+import com.oguzhanp.chess.resources.onboarding_title_offline
+import com.oguzhanp.chess.resources.onboarding_title_progress
 import com.oguzhanp.chess.theme.ChessTheme
+import com.oguzhanp.chess.theme.Corners
+import com.oguzhanp.chess.theme.Spacing
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.launch
 
 // ============================================================
@@ -63,33 +78,29 @@ private enum class OnboardingVisual { LEVELS, PROGRESS, BOARD }
 /** Tek bir onboarding sayfasinin icerigi. */
 private data class OnboardingPage(
     val visual: OnboardingVisual,
-    val title: String,
-    val description: String,
+    val title: StringResource,
+    val description: StringResource,
 )
 
-// Metinler simdilik burada. Faz 6'da dil destegi gelince sozlukten
-// gelecek (mimari kural 7) -- veriyi ayri tuttugumuz icin o gecis
-// yalnizca bu listeyi degistirmek olacak.
+// Metinler artik sozlukten geliyor (mimari kural 7). Compose
+// Resources cihazin diline gore values/ ya da values-tr/ dosyasini
+// seciyor -- ek kod yazmiyoruz.
 private val onboardingPages = listOf(
     OnboardingPage(
         visual = OnboardingVisual.LEVELS,
-        title = "Satranca hos geldin",
-        description = "Guclu bir satranc motoruna karsi oyna. " +
-            "Alti farkli seviye, acemiden tam guce.",
+        title = Res.string.onboarding_title_engine,
+        description = Res.string.onboarding_body_engine,
     ),
     OnboardingPage(
         visual = OnboardingVisual.PROGRESS,
-        title = "Kendini gelistir",
-        description = "Bulmacalar, dersler ve mac sonu analiziyle " +
-            "nerede hata yaptigini gor.",
+        title = Res.string.onboarding_title_progress,
+        description = Res.string.onboarding_body_progress,
     ),
     OnboardingPage(
         visual = OnboardingVisual.BOARD,
-        title = "Her yerde yaninda",
-        description = "Internet gerekmez. Oyunlarin ve ilerlemen " +
-            "cihazinda saklanir.",
-    ),
-)
+        title = Res.string.onboarding_title_offline,
+        description = Res.string.onboarding_body_offline,
+    ))
 
 @Composable
 fun OnboardingScreen(
@@ -116,14 +127,14 @@ fun OnboardingScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(SkipBarHeight)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = Spacing.sm + Spacing.xs),
             contentAlignment = Alignment.CenterEnd,
         ) {
             val isLastPage = pagerState.currentPage == onboardingPages.size - 1
             if (!isLastPage) {
                 TextButton(onClick = onFinish) {
                     Text(
-                        text = "Gec",
+                        text = stringResource(Res.string.onboarding_skip),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -168,7 +179,7 @@ private fun OnboardingPageContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 32.dp),
+            .padding(horizontal = Spacing.xl),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -186,20 +197,20 @@ private fun OnboardingPageContent(
             }
         }
 
-        Spacer(Modifier.height(40.dp))
+        Spacer(Modifier.height(Spacing.xxl))
 
         Text(
-            text = page.title,
+            text = stringResource(page.title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center,
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(Spacing.md))
 
         Text(
-            text = page.description,
+            text = stringResource(page.description),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -243,7 +254,7 @@ private fun PageIndicator(
 
             Box(
                 modifier = Modifier
-                    .padding(horizontal = 4.dp)
+                    .padding(horizontal = Spacing.xs)
                     .size(width = width, height = DotSize)
                     .background(color = color, shape = RoundedCornerShape(percent = 50)),
             )
@@ -266,14 +277,14 @@ private fun OnboardingControls(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 20.dp),
+            .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Ilk sayfada geri tusu yok. Spacer(weight) sagdaki tusu her
         // durumda saga itiyor, yani duzen tek dala bagli degil.
         if (!isFirst) {
             TextButton(onClick = onBack) {
-                Text("Geri", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(Res.string.onboarding_back), style = MaterialTheme.typography.labelLarge)
             }
         }
 
@@ -281,15 +292,17 @@ private fun OnboardingControls(
 
         Button(
             onClick = if (isLast) onFinish else onNext,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(Corners.md),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ),
-            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp),
+            contentPadding = PaddingValues(horizontal = Spacing.lg + Spacing.xs, vertical = Spacing.md - Spacing.xs),
         ) {
             Text(
-                text = if (isLast) "Basla" else "Devam",
+                text = stringResource(
+                    if (isLast) Res.string.onboarding_start else Res.string.onboarding_next
+                ),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
             )

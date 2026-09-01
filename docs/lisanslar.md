@@ -30,6 +30,30 @@ Symbols ikonu da bu başlık altına yazılmalı.
 gerekiyor (Daha Fazla → Destek altında). Bu dosyanın içeriği oraya
 taşınacak.
 
+### Libre Baskerville — Impallari Type
+
+| | |
+|---|---|
+| Dosya / File | `shared/src/commonMain/composeResources/font/libre_baskerville_*.ttf` |
+| Kaynak / Source | https://fonts.google.com/specimen/Libre+Baskerville |
+| Lisans / License | SIL Open Font License 1.1 |
+
+Başlıklarda kullanılıyor.
+
+### Inter — Rasmus Andersson
+
+| | |
+|---|---|
+| Dosya / File | `shared/src/commonMain/composeResources/font/inter_*.ttf` |
+| Kaynak / Source | https://fonts.google.com/specimen/Inter |
+| Lisans / License | SIL Open Font License 1.1 |
+
+Gövde metni ve sayılarda kullanılıyor. Eşit genişlikli rakamları var —
+saat ve puan gösterirken metin kaymıyor.
+
+> SIL OFL, yazı tipinin uygulamaya gömülmesine izin verir; lisans metninin
+> korunmasını ve yazı tipinin tek başına satılmamasını şart koşar.
+
 ---
 
 ## Motor / Engine

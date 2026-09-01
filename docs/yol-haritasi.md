@@ -52,7 +52,7 @@ Kararlar alındı (hamle etkileşimi, taş çizimi, vurgular, koordinatlar).
 
 | | | |
 |---|---|---|
-| 3.0 | **Tasarım sistemi** — tipografi, boşluk ölçeği, köşe yarıçapları | ⬜ *önerildi* |
+| 3.0 | **Tasarım sistemi** — tipografi, boşluk ölçeği, köşe yarıçapları | 🟡 sürüyor |
 | 3.1 | Ölçü/renk sabitleri, kareler, koordinatlar, FEN→tahta, `PieceSet` + Unicode | ⬜ |
 | 3.2 | Vektör taş seti | ⬜ |
 | 3.3 | Seçim, legal hamle noktaları, tıkla-oyna | ⬜ |
@@ -85,9 +85,10 @@ Ana Sayfa · Oyna · Bulmacalar · Öğren · Daha Fazla
 
 ## Faz 6 — Dil, kitap, ses ⬜
 
-- Dil (tr/en): ekrandaki her metin sözlükten gelecek (mimari kural 7).
-  Şu an sabit metinler: `OnboardingScreen`, `EngineTestScreen`,
-  `EngineViewModel.levelName`
+- Dil (tr/en): altyapı **hazır** (Compose Resources, cihaz dili).
+  Kalan iş: uygulama içinden dil seçimi.
+  Hâlâ sabit metin içerenler: `debug/EngineTestScreen.kt`,
+  `EngineViewModel.levelName` — ikisi de Faz 5'te silinecek/taşınacak
 - Açılış kitabı: `book.bin` commit'lenecek, Android'de `assets/` altına;
   `chess_load_book_from_memory` köprüde hazır
 - Ses: 14 ses kimliği (RN sürümünden)
@@ -153,11 +154,26 @@ uyuyor. Yön: klasik ve lüks — sıcak fildişi zemin, bronz/altın vurgu.
 Uygulama içi tema seçimi Faz 6/8'e bırakıldı; `ChessTheme`'in `darkTheme`
 parametresi şimdiden hazır.
 
-### ⬜ Tasarım sistemi *(konuşulacak)*
+### 🟡 Tasarım sistemi (Faz 3.0)
 
-Renkler var ama tipografi, boşluk ölçeği ve köşe yarıçapları yok. Tahtayı
-yapmadan önce oturtulursa Faz 3-5 boyunca dağılmaz. Faz 3.0 olarak
-işaretlendi.
+| | |
+|---|---|
+| Renkler — `theme/ChessColors.kt` | ✅ |
+| Boşluk ve köşe ölçeği — `theme/ChessDimens.kt` | ✅ |
+| Tipografi — `theme/ChessType.kt` | ⬜ font dosyaları bekleniyor |
+
+Seçilen yazı tipleri: **Libre Baskerville** (başlık) + **Inter** (gövde),
+ikisi de SIL OFL. Inter'in eşit genişlikli rakamları Faz 4'teki saat için
+gerekli.
+
+### ✅ Dil altyapısı (2026-09) — Faz 6'dan öne alındı
+
+Compose Resources kullanılıyor: `composeResources/values/strings.xml`
+(İngilizce, varsayılan) + `values-tr/strings.xml`. Cihazın diline göre
+otomatik seçiliyor, kendi sözlük sistemimizi yazmadık.
+
+Kalan iş Faz 6'da: **uygulama içinden dil seçimi** (cihaz dilini ezme).
+Compose Resources'ın "resource environment" API'si bunun için var.
 
 ---
 

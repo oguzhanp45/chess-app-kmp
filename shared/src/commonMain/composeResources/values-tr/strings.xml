@@ -1,0 +1,29 @@
+<resources>
+    <!-- Turkce. Anahtarlar values/strings.xml ile birebir ayni olmali. -->
+
+    <!-- Onboarding -->
+    <string name="onboarding_skip">Geç</string>
+    <string name="onboarding_back">Geri</string>
+    <string name="onboarding_next">Devam</string>
+    <string name="onboarding_start">Başla</string>
+
+    <string name="onboarding_title_engine">Satranca hoş geldin</string>
+    <string name="onboarding_body_engine">Güçlü bir satranç motoruna karşı oyna. Altı farklı seviye, acemiden tam güce.</string>
+
+    <string name="onboarding_title_progress">Kendini geliştir</string>
+    <string name="onboarding_body_progress">Bulmacalar, dersler ve maç sonu analiziyle nerede hata yaptığını gör.</string>
+
+    <string name="onboarding_title_offline">Her yerde yanında</string>
+    <string name="onboarding_body_offline">İnternet gerekmez. Oyunların ve ilerlemen cihazında saklanır.</string>
+
+    <!-- Motor seviyeleri -->
+    <string name="level_novice">Acemi</string>
+    <string name="level_beginner">Başlangıç</string>
+    <string name="level_intermediate">Orta</string>
+    <string name="level_good">İyi</string>
+    <string name="level_hard">Zor</string>
+    <string name="level_full">Tam güç</string>
+
+    <!-- Onboarding görselleri -->
+    <string name="rating_points">%1$d puan</string>
+</resources>
