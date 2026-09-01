@@ -328,7 +328,7 @@ erken `return` yolunda bir sey unutma riski yok.
 ### Neden ham JSON gosteriyoruz
 
 Ekranda snapshot ham metin olarak duruyor. Ayristirmayi Faz 2'ye biraktik:
-burada ayristirsak bir hata ciktiginda "koprü mu bozuk, ayristirici mi bozuk"
+burada ayristirsak bir hata ciktiginda "kopru mu bozuk, ayristirici mi bozuk"
 diye tahmin yurutmek zorunda kalirdik. Faz 1'in tamami bu tahmini onlemek
 uzerine kurulu.
 
@@ -393,4 +393,144 @@ Koprü ayakta ve her iki uctan da dogrulanmis durumda:
 - iOS hedefleri derleniyor
 - Bunlarin hepsi her commit'te otomatik dogrulaniyor
 
-Faz 1'in kurali "koprü calismadan ustune bir sey koyma" idi. Artik koyabiliriz.
+Faz 1'in kurali "kopru calismadan ustune bir sey koyma" idi. Artik koyabiliriz.
+
+---
+
+## Faz 2 — Motor sarmalayicisi
+
+### 2.1 Canli arama bilgisi neden geri cagirim degil
+
+Motor arama sirasinda `info depth 8 seldepth 12 score cp 34 nodes ...`
+satirlari yayiyor ve bunlari ekranda gostermek istiyoruz. Ama arama
+surerken `EngineApi`'ye dokunmak yasak.
+
+Akla ilk gelen `setInfoCallback`'i sinirdan gecirmekti. Bedeli agir:
+Android'de arama is parcacigindan JVM'e donmek `AttachCurrentThread` ve
+saklanmis bir `JavaVM*` istiyor; iOS'ta `staticCFunction` yakalama
+yapamadigi icin `StableRef` ile ugrasmak gerekiyor.
+
+Sectigimiz yol: C katmani info satirini ayristirip alti `std::atomic`
+alana yaziyor.
+
+```
+arama is parcacigi                arayuz is parcacigi
+  motor dusunuyor
+      | info satiri
+      v
+  atomik alanlar   <-------------  okur
+  (C katmaninda,
+   motorun DISINDA)
+```
+
+Arama parcacigi yaziyor, arayuz parcacigi okuyor, motora kimse
+dokunmuyor. Sinirdan fonksiyon isaretcisi gecmiyor, iki platformda da
+ek is yok. `chess_info_depth` ve kardesleri arama surerken cagrilabilir.
+
+### 2.2 JNI adlarini derleme zamaninda dogrulamak
+
+JNI bagi calisma aninda kuruluyor: 29 fonksiyonda tek harf hatasi,
+o fonksiyon ilk cagrildiginda `UnsatisfiedLinkError`. Derleme sirasinda
+hicbir uyari yok.
+
+`tools/check-jni-symbols.sh` bunu derleme zamanina cekiyor:
+
+```
+NativeBridge.kt'den:  external fun makeMove
+        |  JNI ad kurali
+beklenen sembol:      Java_com_oguzhanp_chess_engine_NativeBridge_makeMove
+        |  .so sembol tablosuna bak
+var mi?               evet -> tamam / hayir -> cikis kodu 1
+```
+
+CI'da `android` isinin bir adimi. `RegisterNatives`'e gecmeden ayni
+guvenceyi veriyor.
+
+Tasima notu: Windows'ta Git Bash'te `readelf` ve `nm` yok. Betik once
+PATH'e, bulamazsa `$ANDROID_HOME/ndk` icindeki `llvm-readelf`'e bakiyor
+(`cygpath` ile POSIX yola cevirerek). Cikti bicimine bagimli kalmamak
+icin kolon saymak yerine dogrudan `Java_` ile baslayan adlari topluyor.
+
+### 2.3 Metinden tipe
+
+`chess_snapshot_json` bir metin donduruyor. kotlinx.serialization onu
+tipli bir nesneye ceviriyor. `@Serializable` isaretini goren derleyici
+eklentisi, derleme sirasinda o sinif icin ayristirici URETIYOR -- elle
+JSON okuma kodu yazilmiyor.
+
+Asil kazanc `status` ve `side`'in metin degil enum olmasi:
+
+```kotlin
+when (snapshot.status) {
+    GameStatus.CHECKMATE -> ...
+    GameStatus.STALEMATE -> ...
+    // bir dali unutursan DERLEYICI soyler
+}
+```
+
+`"checkmate"` yazarken bir harf hatasi sessizce yanlis calisirdi.
+
+`ignoreUnknownKeys = true`: C tarafina ileride yeni bir alan eklenirse
+eski Kotlin kirilmasin diye. Ters yon veri siniflarindaki varsayilan
+degerlerle karsilaniyor.
+
+Testlerdeki JSON metinleri uydurma degil, `capitest` ciktisindan alindi.
+Alan adlarindan biri C tarafinda degisirse testler kirilir -- amac bu.
+
+### 2.4 Is parcacigi guvenligini yapisal kilmak
+
+`EngineApi` is parcacigi guvenli degil ve arama surerken gelen bir cagri
+hata vermez, SESSIZCE yanlis cevap verir. RN surumunde bu disiplinle
+korunuyordu. Kotlin'de disiplin yerine tip sistemi koruyor:
+
+```kotlin
+private val engineContext = Dispatchers.Default.limitedParallelism(1)
+```
+
+Motora giden her cagri bu tek slottan geciyor. Arama surerken gelen
+`makeMove` siraya girer, araya giremez. `limitedParallelism` tek slotta
+karsilikli dislama sagliyor (kotlinx.coroutines 1.9'dan beri kararli).
+
+Iki fonksiyon bilerek `suspend` DEGIL, cunku siraya girmemeleri gerekiyor:
+
+| | Neden siraya girmemeli |
+|---|---|
+| `stop()` | Siraya girse aramanin bitmesini beklerdi -- hicbir ise yaramazdi |
+| `currentInfo()` | Arama surerken okunmali |
+
+Ikisi de motora dokunmuyor: `stop` atomik bir bayrak set ediyor,
+`currentInfo` koprunun atomik alanlarini okuyor.
+
+Ayni sebeple canli bilgi yoklayicisi AYRI bir dagiticida kosuyor:
+
+```kotlin
+val poller = launch(Dispatchers.Default) { ... }   // engineContext DEGIL
+```
+
+`engineContext`'te kossaydi aramanin arkasina siralanir ve arama bitene
+kadar hic calismazdi -- yani canli bilgi diye bir sey olmazdi.
+
+`close()` de dikkat istiyor: once `stop()` cagriliyor, sonra yok etme
+isi `engineContext`'e siraya konuyor. Boylece arama ortasinda C++ nesnesi
+silinmiyor.
+
+### Katman semasi (Faz 2 sonu)
+
+```
+NativeEngine      ham kopru, suspend degil, internal   (platforma ozel)
+    v
+ChessEngine       coroutine + tek slotlu dagitici       (commonMain)
+    v
+EngineViewModel   ekranin gordugu durum                 (commonMain)
+    v
+App.kt            sadece cizer
+```
+
+Faz 3'te tahta gelince yalnizca en alt katman degisecek.
+
+### Seviye ve derinlik
+
+`AI.cpp`: `skillMode = (skillLevel < 20)`. Yani seviye 20'de derinlik
+siniri YOK; digerlerinde `1 + (skillLevel * 9) / 20` (seviye 8 -> 4,
+16 -> 8). Tablette tam gucte 1 saniyede derinlik 9 civari gorulmesi
+normal -- sinir degil, cihazin hizi.
