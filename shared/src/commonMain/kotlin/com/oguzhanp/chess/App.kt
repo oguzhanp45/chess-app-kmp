@@ -47,6 +47,12 @@ import com.oguzhanp.chess.engine.Snapshot
 //
 // Yapi: App() ViewModel'i baglar, AppContent() yalnizca aldigini cizer.
 
+// Motorun dusunme suresi. Seviye 20'de derinlik siniri yok, o yuzden
+// sure ne kadar uzunsa o kadar derine iner. Dusuk seviyelerde derinlik
+// tavani devrede oldugu icin bu sayinin etkisi yok -- motor yine aninda
+// oynar. Faz 4'te saat gelince bu deger kalan sureden hesaplanacak.
+private const val ENGINE_THINK_MS = 4000
+
 @Composable
 fun App() {
     MaterialTheme {
@@ -67,7 +73,7 @@ fun App() {
             onPlay = { viewModel.play(moveText) },
             onUndo = viewModel::undo,
             onNewGame = viewModel::newGame,
-            onEngineMove = { viewModel.engineMove(timeMs = 1000) },
+            onEngineMove = { viewModel.engineMove(timeMs = ENGINE_THINK_MS) },
             onStop = viewModel::stopSearch,
             onLevel = viewModel::setSkillLevel,
         )
