@@ -170,6 +170,24 @@ Ustalardan Dersler) · profil ve istatistik · ekstra modlar.
 
 ---
 
+## Süreklilik kuralları
+
+Her adımda uygulanacak, unutulmaması gereken işler.
+
+- **Yeni bir görsel, ikon veya font eklendiğinde** `docs/lisanslar.md`
+  güncellenir. Tek satırlık iş; unutulursa toplaması zor
+- **"Bunu sonra yaparız" denen her şey** bu dosyaya yazılır — konuşmada
+  kalmaz
+- **Yeni sabit metin yazıldığında** Faz 6 bölümüne hangi dosyada olduğu
+  not edilir (sözlüğe taşınacak)
+- **Her büyük adım sonunda** commit + push; CI yeşil olmadan sonraki adıma
+  geçilmez
+- **Motor tarafında bir değişiklik olursa** `engine/VERSION.md` güncellenir
+- Claude bir dosya yazdığında **boyutunu söyler**; dosya Android Studio'da
+  açıksa editör üzerine yazabiliyor, `File → Reload from Disk` gerekiyor
+
+---
+
 ## Değişmez kurallar
 
 1. C++ motoru tek doğru kaynaktır

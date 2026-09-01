@@ -58,7 +58,7 @@ private val DotSize = 8.dp
 private val DotActiveWidth = 28.dp
 
 /** Sayfanin ustunde hangi animasyonun cizilecegi. */
-private enum class OnboardingVisual { LEVELS, RATING, OFFLINE }
+private enum class OnboardingVisual { LEVELS, PROGRESS, BOARD }
 
 /** Tek bir onboarding sayfasinin icerigi. */
 private data class OnboardingPage(
@@ -78,13 +78,13 @@ private val onboardingPages = listOf(
             "Alti farkli seviye, acemiden tam guce.",
     ),
     OnboardingPage(
-        visual = OnboardingVisual.RATING,
+        visual = OnboardingVisual.PROGRESS,
         title = "Kendini gelistir",
         description = "Bulmacalar, dersler ve mac sonu analiziyle " +
             "nerede hata yaptigini gor.",
     ),
     OnboardingPage(
-        visual = OnboardingVisual.OFFLINE,
+        visual = OnboardingVisual.BOARD,
         title = "Her yerde yaninda",
         description = "Internet gerekmez. Oyunlarin ve ilerlemen " +
             "cihazinda saklanir.",
@@ -181,8 +181,8 @@ private fun OnboardingPageContent(
         ) {
             when (page.visual) {
                 OnboardingVisual.LEVELS -> LevelsVisual()
-                OnboardingVisual.RATING -> RatingVisual()
-                OnboardingVisual.OFFLINE -> OfflineVisual()
+                OnboardingVisual.PROGRESS -> ProgressVisual()
+                OnboardingVisual.BOARD -> BoardVisual()
             }
         }
 
